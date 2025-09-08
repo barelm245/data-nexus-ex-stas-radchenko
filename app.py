@@ -30,10 +30,6 @@ def upload_json_to_s3():
         if not json_data:
             return jsonify({"error": "Missing JSON payload in request body"}), 400
 
-        s3_path = request.args.get('s3_path')
-        if not s3_path:
-            return jsonify({"error": "Missing required query parameter: s3_path"}), 400
-
         from models.DicomMetadata import DicomMetadata
         try:
             metadata = DicomMetadata(**json_data)
