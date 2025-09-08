@@ -1,3 +1,5 @@
+pydantic
+botocore
 Flask
 pydicom
 boto3
