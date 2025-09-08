@@ -1,0 +1,7 @@
+Flask
+pydicom
+boto3
+pytest
+moto
+requests
+pytest-mock
