@@ -3,6 +3,7 @@ from managers.DynamoDBManager import DynamoDBManager
 from managers.S3Manager import S3Manager
 from models.DicomMetadata import DicomMetadata
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,19 @@ class DicomMetadataService:
         return ret_val
 
     def upload_metadata_to_s3(self, metadata: DicomMetadata) -> None:
-        filename = f"{metadata.S3Path}.json"
+        # Build filename from the S3 object's basename, keeping only the anon id (without extension)
+        path_without_scheme = metadata.S3Path or ""
+        if path_without_scheme.startswith("s3://"):
+            path_without_scheme = path_without_scheme[len("s3://"):]
+        # strip any leading slashes to normalize
+        path_without_scheme = path_without_scheme.lstrip("/")
+
+        # Take the final path segment (the object key's basename)
+        basename = path_without_scheme.split('/')[-1]
+        # Remove the .dcm extension if present (preserve dots in the anon id)
+        name_without_ext, ext = os.path.splitext(basename)
+
+        filename = f"{name_without_ext}.json"
 
         s3_path = f"{self.presigned_json_s3_path}{filename}"
 
@@ -36,12 +49,22 @@ class DicomMetadataService:
     def get_metadata_from_db(self, s3_path: str) -> DicomMetadata:
         logger.info(f"Looking up metadata in DB for: {s3_path}")
         ret_val = None
-        metadata = self.dynamodb_manager.get_item(s3_path)
+        key_candidate = s3_path
+        if key_candidate.startswith("s3://"):
+            key_candidate = key_candidate[len("s3://"):]
+        key_candidate = key_candidate.lstrip("/")
+
+        basename = key_candidate.split('/')[-1]
+        name_without_ext, _ = os.path.splitext(basename)
+
+        key_name = name_without_ext
+
+        metadata = self.dynamodb_manager.get_item(key_name)
 
         if metadata:
             ret_val = DicomMetadata(**metadata)
-            logger.info(f"Metadata found in DB for: {s3_path}")
+            logger.info(f"Metadata found in DB for: {key_name}")
         else:
-            logger.info(f"No metadata in DB for: {s3_path}")
+            logger.info(f"No metadata in DB for: {key_name}")
 
         return ret_val

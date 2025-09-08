@@ -4,6 +4,7 @@ import config
 from managers.DynamoDBManager import DynamoDBManager
 from models.DicomMetadata import DicomMetadata
 import logging
+import os
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -38,14 +39,22 @@ def lambda_handler(event, context):
                 metadata_dict = json.loads(json_content)
                 metadata = DicomMetadata(**metadata_dict)
 
+                # Derive the suffix (basename without .json) to use as the DynamoDB key
+                basename = os.path.basename(object_key)  # e.g. 'anon-....json'
+                name_without_ext, _ = os.path.splitext(basename)  # e.g. 'anon-...'
+
+                # Use only the anon id (name_without_ext) as the DynamoDB item id
+                key_name = name_without_ext
+
+                # Optionally, keep the original JSON S3 path in the stored data
                 s3_path = f"s3://{bucket_name}/{object_key}"
 
                 dynamodb_manager.put_item(
-                    key_name=s3_path,
+                    key_name=key_name,
                     data_dict=metadata.model_dump(exclude_none=True)
                 )
 
-                logger.info(f"Successfully stored metadata for {s3_path} in DynamoDB")
+                logger.info(f"Successfully stored metadata for {key_name} in DynamoDB")
                 logger.info(
                     f"Metadata: PatientID={metadata.PatientID}, StudyDate={metadata.StudyDate}, Modality={metadata.Modality}")
 
